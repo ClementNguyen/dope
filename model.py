@@ -180,10 +180,9 @@ class Dope_RoIHeads(RoIHeads):
             dope_features = dope_features.half()          
         else:
             dope_features = self.dope_roi_pool(features, proposals, image_shapes)
-            
         # head
         dope_features = self.dope_head(dope_features)
-        
+        self.pooled_features = dope_features.clone().detach() # keep features
         # predictor
         class_logits, dope_regression = self.dope_predictor(dope_features)
 
