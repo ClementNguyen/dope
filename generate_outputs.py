@@ -8,6 +8,7 @@ import torch
 import gzip
 import pickle
 import copy
+import torch.nn.functional as F
 from torchvision.transforms import ToTensor
 
 from lcr_net_ppi_improved import LCRNet_PPI_improved
@@ -88,20 +89,16 @@ if __name__=="__main__":
             tmp_feat = {
                 'body_feat': [],
                 'body_scores': [],
-                'body_2d': [],
-                'body_3d': [],
+                'body_deltas': [],
                 'face_feat': [],
                 'face_scores': [],
-                'face_2d': [],
-                'face_3d': [],
+                'face_deltas': [],
                 'hand_feat_1': [],
                 'hand_scores_1': [],
-                'hand_2d_1': [],
-                'hand_3d_1': [],
+                'hand_deltas_1': [],
                 'hand_feat_2': [],
                 'hand_scores_2': [],
-                'hand_2d_2': [],
-                'hand_3d_2': []
+                'hand_deltas_2': []
             }
 
             for image in imlist:
@@ -159,28 +156,28 @@ if __name__=="__main__":
                 # Get features and model predictions
 
                 pooled_features = model.roi_heads.pooled_features
+                class_logits = model.roi_heads.class_logits
+                dope_regression = model.roi_heads.dope_regression
 
                 # body features
-                body_scores = 1 - result['body_scores'][:, 0]
+                body_scores = F.softmax(class_logits['body'], dim=-1)
+                body_scores = 1 - body_scores[:, 0]
                 best_body_roi_idx = torch.argmax(body_scores)
                 body_features = pooled_features[best_body_roi_idx]
-                body_2d_pred_from_feat = result['body_pose2d'][best_body_roi_idx]
-                body_3d_pred_from_feat = result['body_pose3d'][best_body_roi_idx]
+                body_deltas = dope_regression['body'][best_body_roi_idx]
                 tmp_feat['body_feat'].append(body_features)
-                tmp_feat['body_scores'].append(result['body_scores'][best_body_roi_idx])
-                tmp_feat['body_2d'].append(body_2d_pred_from_feat.flatten())
-                tmp_feat['body_3d'].append(body_3d_pred_from_feat.flatten())
+                tmp_feat['body_scores'].append(class_logits['body'][best_body_roi_idx])
+                tmp_feat['body_deltas'].append(body_deltas.flatten())
 
                 # face features
-                face_scores = 1 - result['face_scores'][:, 0]
+                face_scores = F.softmax(class_logits['face'], dim=-1)
+                face_scores = 1 - face_scores[:, 0]
                 best_face_roi_idx = torch.argmax(face_scores)
                 face_features = pooled_features[best_face_roi_idx]
-                face_2d_pred_from_feat = result['face_pose2d'][best_face_roi_idx]
-                face_3d_pred_from_feat = result['face_pose3d'][best_face_roi_idx]
+                face_deltas = dope_regression['face'][best_face_roi_idx]
                 tmp_feat['face_feat'].append(face_features)
-                tmp_feat['face_scores'].append(result['face_scores'][best_face_roi_idx])
-                tmp_feat['face_2d'].append(face_2d_pred_from_feat.flatten())
-                tmp_feat['face_3d'].append(face_3d_pred_from_feat.flatten())
+                tmp_feat['face_scores'].append(class_logits['face'][best_face_roi_idx])
+                tmp_feat['face_deltas'].append(face_deltas.flatten())
 
                 # hand features
                 dets, indices, bestcls = postprocess.DOPE_NMS(result['hand_scores'], result['boxes'], result['hand_pose2d'],
@@ -192,18 +189,14 @@ if __name__=="__main__":
                 best_hand_roi_idx_2 = indices_sort[1]
                 hand_features_1 = hand_features[best_hand_roi_idx_1]
                 hand_features_2 = hand_features[best_hand_roi_idx_2]
-                hand_2d_pred_from_feat_1 = (result['hand_pose2d'][indices])[best_hand_roi_idx_1]
-                hand_3d_pred_from_feat_1 = (result['hand_pose3d'][indices])[best_hand_roi_idx_1]
-                hand_2d_pred_from_feat_2 = (result['hand_pose2d'][indices])[best_hand_roi_idx_2]
-                hand_3d_pred_from_feat_2 = (result['hand_pose3d'][indices])[best_hand_roi_idx_2]
+                hand_deltas_1 = dope_regression['hand'][indices][best_hand_roi_idx_1]
+                hand_deltas_2 = dope_regression['hand'][indices][best_hand_roi_idx_2]
                 tmp_feat['hand_feat_1'].append(hand_features_1)
-                tmp_feat['hand_scores_1'].append((result['hand_scores'][indices, :])[best_hand_roi_idx_1])
-                tmp_feat['hand_2d_1'].append(hand_2d_pred_from_feat_1.flatten())
-                tmp_feat['hand_3d_1'].append(hand_3d_pred_from_feat_1.flatten())
+                tmp_feat['hand_scores_1'].append((class_logits['hand'][indices, :])[best_hand_roi_idx_1])
+                tmp_feat['hand_deltas_1'].append(hand_deltas_1.flatten())
                 tmp_feat['hand_feat_2'].append(hand_features_2)
-                tmp_feat['hand_scores_2'].append((result['hand_scores'][indices, :])[best_hand_roi_idx_2])
-                tmp_feat['hand_2d_2'].append(hand_2d_pred_from_feat_2.flatten())
-                tmp_feat['hand_3d_2'].append(hand_3d_pred_from_feat_2.flatten())
+                tmp_feat['hand_scores_2'].append((class_logits['hand'][indices, :])[best_hand_roi_idx_2])
+                tmp_feat['hand_deltas_2'].append(hand_deltas_2.flatten())
 
                 # for key in list(tmp_feat.keys())[4:]:
                 #   tmp_feat[key] = tmp_feat[key].cpu().detach()

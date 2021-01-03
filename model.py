@@ -185,6 +185,8 @@ class Dope_RoIHeads(RoIHeads):
         self.pooled_features = dope_features.clone().detach() # keep features
         # predictor
         class_logits, dope_regression = self.dope_predictor(dope_features)
+        self.class_logits = class_logits
+        self.dope_regression = dope_regression
 
         # process results
         result = []
