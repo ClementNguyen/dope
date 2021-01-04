@@ -60,6 +60,10 @@ if __name__=="__main__":
 
             print('Computing output for video {} / {}'.format(video_idx + 1, len(video_list)))
 
+            if os.path.exists('/home/clement_ngn/slt/data/dope_outputs/pose_estimation/' + set_name + '/' + video[:-4] + '.p') and \
+                    os.path.exists('/home/clement_ngn/slt/data/dope_outputs/features/' + set_name + '/' + video[:-4] + '.p'):
+                continue
+
             # copy features
             output_keypoints = dict()
             output_keypoints['name'] = set_name + '/' + video[:-4]
